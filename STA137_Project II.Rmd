@@ -1,0 +1,251 @@
+---
+title: "STA137 Project II"
+author: "Junyao Lu"
+date: "12/02/2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+\clearpage
+```{r, echo = FALSE}
+mortgage_df = read.delim("mortgage.txt", sep = " ", header = TRUE)
+mortgage_df$date = as.Date(ISOdate(year = mortgage_df$year, 
+                                   month = mortgage_df$month, 
+                                   day = mortgage_df$day))
+dimension = dim(mortgage_df)
+min = mortgage_df[1,1:2]
+max = mortgage_df[488,1:2]
+```
+
+# Introduction
+A mortgage is known as a type of loan that people can borrow money from banks and financial institutions to buy or refinance a home or piece of property. The mortgage rate is the interest rate of the mortgage, which can be fixed or fluctuate depending on the agreements. In order to understand the past mortgage rates, predict future mortgage rates, and make relative policy suggestions, the dataset of the US monthly 30-year conventional mortgage rates from April 1971 to November 2011 is obtained from Federal Reserve Economic Data to develop a precise statistical model. We are also interested in investigating the relationship between the mortgage rates and the Federal Funds rates. There are in total of 488 observations in the dataset collected from 1971 to 2011. There are 5 variables in the dataset, which are year, month, day, morg known as the monthly mortgage rate, and ffr known as the monthly federal funds rate. There is one additional date variable constructed based on the values of variables year, month, and day, which is useful for the time series analysis. In the following report, we are going to examine the stationarity of the data, transform the data if it is not stationary, build ARIMA models, perform model checking and selection, and fit a time series model for the mortgage rate and the lag-1 federal funds. 
+
+
+# Material and Methods
+This dataset is time-series data because each observation is collected at successive time periods, which is the first day of each month from April 1971 to November 2011. For the variable morg, the minimum monthly mortgage rate is 3.990, the maximum monthly mortgage rate is 18.450, and the mean is 8.800. From the histogram, we can see that the monthly mortgage rate is right-skewed, which means that there are a lot of observations that are larger than the mode. The boxplot reveals the same information that there are a lot of outliers beyond the upper whisker. For the variable ffr, the minimum monthly federal funds rate is 0.070, the maximum monthly federal funds rate is 19.100, and the mean is 5.995. The histogram of the monthly federal funds rate also shows a right skewness, and the boxplot points out a lot of outliers beyond the upper whisker.
+
+
+```{r, echo = FALSE}
+par(mfrow=c(1, 2))
+hist(mortgage_df$morg, cex.main=0.9, 
+     xlab = "Monthly Mortgage Rate", 
+     main = "Histogram of Monthly Mortgage Rate")
+boxplot(mortgage_df$morg, cex.main=0.9, 
+        xlab = "Monthly Mortgage Rate", 
+        main = "Boxplot of Monthly Mortgage Rate")
+par(mfrow=c(1, 2))
+hist(mortgage_df$ffr, cex.main=0.9, 
+     xlab = "Monthly Federal Funds Rate", 
+     main = "Histogram of Monthly Federal Funds Rate")
+boxplot(mortgage_df$ffr, cex.main=0.9, 
+        xlab = "Monthly Federal Funds Rate", 
+        main = "Histogram of Monthly Federal Funds Rate")
+```
+
+
+
+The scatter plot of these two variables shows that there is a positive linear relationship between the monthly mortgage interest rate and the monthly federal funds rate. As the monthly mortgage interest rate increases, the monthly federal funds rate also tends to increase.
+
+
+```{r, echo = FALSE}
+par(mfrow=c(1, 1))
+plot(mortgage_df$morg, mortgage_df$ffr, cex.main=0.9, 
+     xlab = "Monthly Mortgage Rate", 
+     ylab = "Monthly Federal Funds Rate", 
+     main = "Scatterplot of Monthly Mortgage Rate and Monthly Federal Funds Rate")
+abline(lm(mortgage_df$ffr~mortgage_df$morg), col = "red")
+```
+
+
+
+Then, from the time series plot of the monthly mortgage interest rate, it can be seen that there is a clear trend in the data, and there is no constant mean and variance. So, the data is not stationary. The ACF ordinates are large and decay slowly, and the PACF cuts off after lag 1. These observations also confirm that the data is not stationary.
+
+
+```{r, echo = FALSE}
+par(mfrow=c(1, 1))
+ts.plot(mortgage_df$morg, type = "l", 
+        ylab = "Monthly Mortgage Rate", 
+        main = "Time Series Plot of Monthly Mortgage Rate")
+par(mfrow=c(1, 2))
+acf(mortgage_df$morg)
+pacf(mortgage_df$morg)
+```
+
+
+
+In order to fix the problem of nonstationarity, we can apply transformations to the original data, such as log transformation, log differencing, and differencing. Next, we are going to apply each of these transformations to the data to see if they can make the transformed series stationary.
+
+## Log Transformation
+After applying log transformation to the data, we can see that there is still a obvious trend in the plot and there is no constant mean and variance. The problem of nonstationarity is not fix by using log transformation. So, we will not continue using this method.
+
+
+```{r, echo = FALSE}
+par(mfrow=c(1, 1))
+ts.plot(log(mortgage_df$morg), type = "l", ylab = "log(Monthly Mortgage Rate)")
+```
+
+
+
+## Log Differencing
+Then, we apply log differencing to the original data to see if this method helps. From the new time series plot, we observe that there is no significant trend and the data is roughly stationary. The ACF and PACF plots of the log difference series suggest a MA(2) model and a ARMA(2, 2) model. 
+
+
+```{r, echo = FALSE}
+par(mfrow=c(1, 1))
+ts.plot(diff(log(mortgage_df$morg)), type = "l", 
+        ylab = "diff(log(Monthly Mortgage Rate))")
+par(mfrow=c(1, 2))
+acf(diff(log(mortgage_df$morg)))
+pacf(diff(log(mortgage_df$morg)))
+```
+
+
+
+Then, we examine both models to see if they fit the data well. 
+
+### Fitting MA(2) to the log difference series
+```{r, echo = FALSE}
+fit_ma = astsa::sarima(diff(log(mortgage_df$morg)), 0, 0, 2)
+```
+
+
+#### Estimated parameters of MA(2)
+```{r, echo = FALSE}
+fit_ma$ttable
+```
+
+
+### Fitting ARMA(2, 2) to the log difference series
+```{r, echo = TRUE}
+fit_arma = astsa::sarima(diff(log(mortgage_df$morg)), 2, 0, 2)
+```
+
+
+#### Estimated parameters of ARMA(2, 2)
+```{r, echo = FALSE}
+fit_arma$ttable
+```
+
+
+From the results above, there is no apparent trend or pattern in both plots of the standardized residuals. For both models, the ACF shows no apparent significant dependence structure, as the ordinates are within the blue bounds. For the normal Q-Q plots, most of the points lie on the blue line. There are some deviations on both tails, probably due to the existence of outliers. But the normality assumption seems to be appropriate with the exception of outliers for both models. The only difference is that all the p-values for Ljung-Box statistics are above the blue dotted line for ARMA(2, 2), but some of the p-values for MA(2) are on or below the blue dotted line. Hence, ARMA(2, 2) for the log difference series is a better model for the data. From the estimated parameters for the model ARMA(2, 2), we can see that some of the p values are very large, which indicates that some of the estimated parameters are not statistically significant. So, this model may not be the best model to fit the data. We might need to consider other models. 
+
+
+
+## Differencing
+Differencing is another transformation that can be used. By using the first-order difference, the data becomes roughly stationary in the new graph, and there is no obvious trend. The ACF and PACF plots suggest a ARIMA(2, 1, 0) model and a ARIMA(2, 1, 2) model to the original series. 
+
+
+```{r, echo = FALSE}
+par(mfrow=c(1, 1))
+ts.plot(diff(mortgage_df$morg), type = "l", 
+        ylab = "diff(Monthly Mortgage Rate)")
+par(mfrow=c(1, 2))
+acf(diff(mortgage_df$morg))
+pacf(diff(mortgage_df$morg))
+```
+
+
+
+### Fitting ARIMA(2, 1, 0)
+```{r, echo = FALSE}
+fit_arima210 = astsa::sarima(mortgage_df$morg, 2, 1, 0)
+```
+
+
+
+### 
+#### Estimated parameters of ARIMA(2, 1, 0)
+```{r, echo = FALSE}
+fit_arima210$ttable
+```
+
+
+### Fitting ARIMA(2, 1, 2)
+```{r, echo = FALSE}
+fit_arima212 = astsa::sarima(mortgage_df$morg, 2, 1, 2)
+```
+
+
+#### Estimated parameters of ARIMA(2, 1, 2)
+```{r, echo = FALSE}
+fit_arima212$ttable
+```
+
+
+From the results above, we conclude that there is no apparent trend or pattern in the plots of standardized residuals. For both models, the ACF shows no apparent significant dependence structure, as the ordinates are within the blue bounds. For the normal Q-Q plots, most of the points lie on the blue line. There are some deviations on both tails, probably due to the existence of outliers. But the normality assumption seems to be appropriate with the exception of outliers for both models. All the p-values for Ljung-Box statistics are above the blue dotted line, which indicates that the processes match the white noise process. Thus, both models fit well to the data and estimated parameters are significant. 
+
+
+In order to find the best fit model, we are going to perform model selection by coparing AIC, AICc, and BIC. 
+
+### ARIMA(2, 1, 0)
+AIC:
+```{r, echo = FALSE}
+fit_arima210$AIC
+```
+AICc:
+```{r, echo = FALSE}
+fit_arima210$AICc
+```
+BIC:
+```{r, echo = FALSE}
+fit_arima210$BIC
+```
+
+### ARIMA(2, 1, 2)
+AIC:
+```{r, echo = FALSE}
+fit_arima212$AIC
+```
+AICc:
+```{r, echo = FALSE}
+fit_arima212$AICc
+```
+BIC:
+```{r, echo = FALSE}
+fit_arima212$BIC
+```
+
+
+From the above results, we notice that both AIC and AICc are smaller for ARIMA(2, 1, 2), which indicates that ARIMA(2, 1, 2) is a better fit. The BIC criterion is smaller for ARIMA(2, 1, 0). And the statistics are close to each other for both models, so they are both good fits. However, we also notice that some of the estimated parameters for ARIMA(2, 1, 2) are not significant. In this case, ARIMA(2, 1, 0) might be a better choice. As a final check, we might consider to overfit the model to see if the results change significantly. We find out that ARIMA(3, 1, 0) fits the data even better. Also, the AIC, AICc, and BIC are smaller for ARIMA(3, 1, 0) compared to others. Therefore, we think ARIMA(3, 1, 0) is the best fit model. 
+$$x_t = 0.5710x_{t-1} + 0.5710x_{t-2} + 0.1037x_{t-3} + w_t$$
+
+```{r, echo = FALSE}
+fit_arima310 = astsa::sarima(mortgage_df$morg, 3, 1, 0)
+fit_arima310
+fit_arima310$ttable
+fit_arima310$AIC
+fit_arima310$AICc
+fit_arima310$BIC
+```
+
+
+Next, we are going to find a time series model for the mortgage rate using the lag-1 federal funds rate as an explanatory variable. From the plot, we can see that there is a positive linear relationship between the mortgage rate and the lag-1 federal funds. This suggests that the model to consider could be $$M_{t} = \beta_0 + \beta_1F_{t-1} + x_{t}$$
+
+
+```{r, echo = FALSE}
+mortgage_df$ffr_lag1 = Hmisc::Lag(mortgage_df$ffr, 1)
+plot(mortgage_df$morg, mortgage_df$ffr_lag1)
+```
+
+
+Then, based on the result, the plots of ACF and PACF are consistent with those of a AR(1) process. 
+```{r, echo = FALSE}
+fit = lm(mortgage_df$morg ~ mortgage_df$ffr_lag1)
+par(mfrow=c(1, 2))
+acf(resid(fit))
+pacf(resid(fit))
+x = astsa::sarima(mortgage_df$morg, 1, 0, 0, xreg = mortgage_df$ffr_lag1)
+```
+
+# Results
+$$x_t = 0.5710x_{t-1} + 0.5710x_{t-2} + 0.1037x_{t-3} + w_t$$
+
+$$M_{t} = 4.62099 + 0.69606F_{t-1} + x_{t}$$
+$$x_{t} = 0.9931x_{t-1} + w_{t}$$ where {wt} ~ WN(0, 0.07492)
+
+\clearpage
+# Appendix
+```{r, ref.label=knitr::all_labels(),echo=TRUE,eval=FALSE}
+```
